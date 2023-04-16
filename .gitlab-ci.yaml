@@ -1,0 +1,43 @@
+variables:
+    NEXUS_DOMAIN: "##"
+    REPOS: "##"
+    ALL_COUNT: "5"
+    NUGET_RELEASE_COUNT: "15"
+    NUGET_COUNT: "10"
+    ##_OLD: "10"
+    ##_NEW: "10"
+    READY_TO_DEL: "True"
+
+stages:
+  - build
+  - cleaning
+
+Build and Push:
+    stage: build
+    except:
+    - schedules
+    only:
+        changes:
+        - Dockerfile
+        - requirements.txt
+        - "*.{py}"
+    tags:
+    - infra
+    script: |
+        docker build --pull -t $CI_PROJECT_NAME .
+        docker tag $CI_PROJECT_NAME $DOCKERHUB/$CI_PROJECT_PATH:latest
+        docker push $DOCKERHUB/$CI_PROJECT_PATH:latest
+
+Nexus Cleaning:
+    stage: cleaning
+    only:
+    - schedules
+    tags:
+    - infra
+    script: |
+        docker rm --force $CI_PROJECT_NAME && \
+        docker run --name $CI_PROJECT_NAME --pull always \
+        --env NEXUS_DOMAIN=$NEXUS_DOMAIN --env NEXUS_USER=$NEXUS_USER \
+        --env NEXUS_PASSWORD=$NEXUS_PASSWORD --env REPOS=$REPOS --env ALL_COUNT=$ALL_COUNT \
+        --env NUGET_RELEASE_COUNT=$NUGET_RELEASE_COUNT --env NUGET_COUNT=$NUGET_COUNT --env ##_OLD=$##_OLD \
+        --env ##_NEW=$##_NEW --env READY_TO_DEL=$READY_TO_DEL $DOCKERHUB/$CI_PROJECT_PATH:latest
